@@ -1,7 +1,12 @@
 import UIKit
 
 @MainActor
-final class AlertPresenter {
+protocol AlertPresenting {
+    func show(model: AlertModel)
+}
+
+@MainActor
+final class AlertPresenter: AlertPresenting {
     private weak var viewController: UIViewController?
 
     init(viewController: UIViewController) {

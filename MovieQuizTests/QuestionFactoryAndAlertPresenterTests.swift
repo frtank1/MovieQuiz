@@ -39,7 +39,7 @@ final class QuestionFactoryTests: XCTestCase {
         }
     }
 
-    private final class NetworkClientStub: NetworkClientProtocol {
+    private final class NetworkClientStub: NetworkRouting {
         struct Request {
             let url: URL
             let handler: (Result<Data, Error>) -> Void

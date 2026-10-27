@@ -214,7 +214,28 @@ final class NetworkClientTests: XCTestCase {
 }
 
 final class MoviesLoaderTests: XCTestCase {
-    private final class NetworkClientStub: NetworkClientProtocol {
+    private final class StubNetworkClient: NetworkRouting {
+        enum TestError: Error, Equatable {
+            case test
+        }
+
+        private let emulateError: Bool
+
+        init(emulateError: Bool) {
+            self.emulateError = emulateError
+        }
+
+        func fetch(url: URL, handler: @escaping (Result<Data, Error>) -> Void) {
+            if emulateError {
+                handler(.failure(TestError.test))
+            } else {
+                let json = #"{"errorMessage":"","items":[{"fullTitle":"Prey (2022)","imDbRating":"7.2","image":"https://images.example.invalid/prey.jpg"},{"fullTitle":"The Gray Man (2022)","imDbRating":"6.5","image":"https://images.example.invalid/the-gray-man.jpg"}]}"#
+                handler(.success(Data(json.utf8)))
+            }
+        }
+    }
+
+    private final class NetworkClientStub: NetworkRouting {
         let result: Result<Data, Error>
         private(set) var requestedURLs: [URL] = []
 
@@ -230,6 +251,45 @@ final class MoviesLoaderTests: XCTestCase {
 
     private let url = URL(string: "https://movies-loader.example.invalid/catalog")!
     private let item = #"{"fullTitle":"Film (2026)","title":"Film","imDbRating":8.2,"image":"https://images.example.invalid/poster.jpg"}"#
+
+    func testSuccessLoading() {
+        let networkClient = StubNetworkClient(emulateError: false)
+        let loader = MoviesLoader(networkClient: networkClient, url: url)
+        let loaded = expectation(description: "Two movies loaded")
+
+        loader.loadMovies { result in
+            switch result {
+            case .success(let movies):
+                XCTAssertEqual(movies.items.count, 2)
+                XCTAssertEqual(movies.errorMessage, "")
+                XCTAssertEqual(movies.items.map(\.title), ["Prey (2022)", "The Gray Man (2022)"])
+                XCTAssertEqual(movies.items.map(\.rating), ["7.2", "6.5"])
+            case .failure(let error):
+                XCTFail("Unexpected loading error: \(error)")
+            }
+            loaded.fulfill()
+        }
+
+        wait(for: [loaded], timeout: 1)
+    }
+
+    func testFailureLoading() {
+        let networkClient = StubNetworkClient(emulateError: true)
+        let loader = MoviesLoader(networkClient: networkClient, url: url)
+        let failed = expectation(description: "Stub error received")
+
+        loader.loadMovies { result in
+            switch result {
+            case .success:
+                XCTFail("Expected stub failure")
+            case .failure(let error):
+                XCTAssertEqual(error as? StubNetworkClient.TestError, .test)
+            }
+            failed.fulfill()
+        }
+
+        wait(for: [failed], timeout: 1)
+    }
 
     private func load(_ json: String) throws -> Result<MostPopularMovies, Error> {
         let client = NetworkClientStub(result: .success(Data(json.utf8)))

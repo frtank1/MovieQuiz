@@ -1,4 +1,5 @@
-import UIKit
+import Foundation
+import ImageIO
 
 enum QuestionFactoryError: LocalizedError {
     case noMovies
@@ -22,7 +23,7 @@ enum QuestionFactoryError: LocalizedError {
 
 final class QuestionFactory: QuestionFactoryProtocol {
     private let moviesLoader: MoviesLoading
-    private let networkClient: NetworkClientProtocol
+    private let networkClient: NetworkRouting
     private weak var delegate: QuestionFactoryDelegate?
     private var movies: [MostPopularMovie] = []
     private var loadID: UUID?
@@ -31,7 +32,7 @@ final class QuestionFactory: QuestionFactoryProtocol {
     init(
         moviesLoader: MoviesLoading,
         delegate: QuestionFactoryDelegate,
-        networkClient: NetworkClientProtocol = NetworkClient()
+        networkClient: NetworkRouting = NetworkClient()
     ) {
         self.moviesLoader = moviesLoader
         self.delegate = delegate
@@ -89,7 +90,10 @@ final class QuestionFactory: QuestionFactoryProtocol {
         }
         networkClient.fetch(url: posterURL) { [weak self] result in
             let questionResult: Result<QuizQuestion, Error> = result.flatMap { data in
-                guard UIImage(data: data) != nil else {
+                guard
+                    let source = CGImageSourceCreateWithData(data as CFData, nil),
+                    CGImageSourceCreateImageAtIndex(source, 0, nil) != nil
+                else {
                     return .failure(QuestionFactoryError.invalidImage)
                 }
                 return .success(QuizQuestion(

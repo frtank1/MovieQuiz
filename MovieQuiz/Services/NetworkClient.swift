@@ -1,6 +1,6 @@
 import Foundation
 
-protocol NetworkClientProtocol {
+protocol NetworkRouting {
     func fetch(url: URL, handler: @escaping (Result<Data, Error>) -> Void)
 }
 
@@ -21,7 +21,7 @@ enum NetworkClientError: LocalizedError {
     }
 }
 
-struct NetworkClient: NetworkClientProtocol {
+struct NetworkClient: NetworkRouting {
     private let session: URLSession
 
     init(session: URLSession = .shared) {

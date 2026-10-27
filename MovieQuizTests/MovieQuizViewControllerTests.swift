@@ -9,6 +9,7 @@ final class MovieQuizViewControllerTests: XCTestCase {
         var automaticallyResponds = true
         var loadCount = 0
         var requestCount = 0
+        private(set) var currentQuestion: QuizQuestion?
 
         func loadData() {
             loadCount += 1
@@ -21,11 +22,13 @@ final class MovieQuizViewControllerTests: XCTestCase {
             requestCount += 1
             if automaticallyResponds {
                 let data = UIImage(named: "The Godfather")?.pngData() ?? Data()
-                delegate?.didReceiveNextQuestion(question: QuizQuestion(
+                let question = QuizQuestion(
                     image: data,
                     text: "Рейтинг этого фильма больше, чем 7?",
                     correctAnswer: true
-                ))
+                )
+                currentQuestion = question
+                delegate?.didReceiveNextQuestion(question: question)
             }
         }
     }
@@ -150,10 +153,10 @@ final class MovieQuizViewControllerTests: XCTestCase {
             controller.view.setNeedsLayout()
             controller.view.layoutIfNeeded()
 
-            let poster: UIImageView = try find("moviePoster", in: controller.view)
+            let poster: UIImageView = try find("Poster", in: controller.view)
             let question: UILabel = try find("questionText", in: controller.view)
-            let yes: UIButton = try find("yesButton", in: controller.view)
-            let no: UIButton = try find("noButton", in: controller.view)
+            let yes: UIButton = try find("Yes", in: controller.view)
+            let no: UIButton = try find("No", in: controller.view)
             try await waitUntil { yes.isEnabled && no.isEnabled }
             controller.view.setNeedsLayout()
             controller.view.layoutIfNeeded()
@@ -212,7 +215,7 @@ final class MovieQuizViewControllerTests: XCTestCase {
         defer { screen.close() }
         let indicator: UIActivityIndicatorView = try find("loadingIndicator", in: screen.controller.view)
 
-        screen.controller.didFailToLoadData(with: URLError(.notConnectedToInternet))
+        screen.factory.delegate?.didFailToLoadData(with: URLError(.notConnectedToInternet))
         try await waitUntil { presenter.models.count == 1 }
         XCTAssertFalse(indicator.isAnimating)
         XCTAssertFalse(screen.yes.isEnabled)
@@ -238,7 +241,9 @@ final class MovieQuizViewControllerTests: XCTestCase {
         let screen = try await makeScreen(factory: factory, alertPresenter: presenter, waitsForQuestion: false)
         defer { screen.close() }
 
-        screen.controller.didReceiveNextQuestion(question: nil)
+        screen.factory.delegate?.didLoadDataFromServer()
+        try await waitUntil { screen.factory.requestCount == 1 }
+        screen.factory.delegate?.didReceiveNextQuestion(question: nil)
         try await waitUntil { presenter.models.count == 1 }
         XCTAssertEqual(presenter.models.first?.title, "Ошибка")
         XCTAssertFalse(screen.yes.isEnabled)
@@ -250,7 +255,8 @@ final class MovieQuizViewControllerTests: XCTestCase {
         let screen = try await makeScreen(alertPresenter: presenter)
         defer { screen.close() }
         screen.yes.sendActions(for: .touchUpInside)
-        screen.controller.showNetworkError(message: "Ошибка постера")
+        screen.factory.delegate?.didFailToLoadData(with: QuestionFactoryError.invalidImage)
+        try await waitUntil { presenter.models.count == 1 }
         try await Task.sleep(nanoseconds: 1_200_000_000)
 
         XCTAssertEqual(screen.factory.requestCount, 1)
@@ -266,11 +272,16 @@ final class MovieQuizViewControllerTests: XCTestCase {
     ) throws -> MovieQuizViewController {
         let storyboard = UIStoryboard(name: "Main", bundle: Bundle(for: MovieQuizViewController.self))
         let controller = try XCTUnwrap(storyboard.instantiateInitialViewController() as? MovieQuizViewController)
-        if let statisticService {
-            controller.setup(statisticService: statisticService)
+        controller.setup { view in
+            MovieQuizPresenter(
+                viewController: view,
+                statisticService: statisticService ?? StatisticService(),
+                questionFactoryBuilder: { delegate in
+                    factory.delegate = delegate
+                    return factory
+                }
+            )
         }
-        factory.delegate = controller
-        controller.setup(questionFactory: factory)
         if let alertPresenter {
             controller.setup(alertPresenter: alertPresenter)
         }
@@ -296,11 +307,11 @@ final class MovieQuizViewControllerTests: XCTestCase {
         let screen = QuizScreen(
             controller: controller,
             window: window,
-            poster: try find("moviePoster", in: controller.view),
+            poster: try find("Poster", in: controller.view),
             question: try find("questionText", in: controller.view),
-            number: try find("questionNumber", in: controller.view),
-            yes: try find("yesButton", in: controller.view),
-            no: try find("noButton", in: controller.view),
+            number: try find("Index", in: controller.view),
+            yes: try find("Yes", in: controller.view),
+            no: try find("No", in: controller.view),
             statistics: statistics,
             storage: storage,
             suiteName: suiteName,
@@ -313,8 +324,7 @@ final class MovieQuizViewControllerTests: XCTestCase {
     }
 
     private func currentQuestion(on screen: QuizScreen) throws -> QuizQuestion {
-        let storage = try XCTUnwrap(Mirror(reflecting: screen.controller).children.first { $0.label == "currentQuestion" }?.value)
-        return try XCTUnwrap(Mirror(reflecting: storage).children.first?.value as? QuizQuestion)
+        try XCTUnwrap(screen.factory.currentQuestion)
     }
 
     private func assertResult(_ alert: UIAlertController, correct: Int, on screen: QuizScreen, file: StaticString = #filePath, line: UInt = #line) {

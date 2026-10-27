@@ -13,16 +13,20 @@ final class MovieQuizViewControllerTests: XCTestCase {
         let number: UILabel
         let yes: UIButton
         let no: UIButton
+        let statistics: StatisticService
+        let storage: UserDefaults
+        let suiteName: String
 
         func close() {
             controller.dismiss(animated: false)
             window.isHidden = true
             window.rootViewController = nil
+            storage.removePersistentDomain(forName: suiteName)
         }
     }
 
-    func testStoryboardStartsAtFirstQuestionWithLoadedPoster() throws {
-        let screen = try makeScreen()
+    func testStoryboardStartsAtFirstQuestionWithLoadedPoster() async throws {
+        let screen = try await makeScreen()
         defer { screen.close() }
 
         XCTAssertEqual(screen.number.text, "1/10")
@@ -31,7 +35,8 @@ final class MovieQuizViewControllerTests: XCTestCase {
         XCTAssertEqual(screen.no.title(for: .normal), "Нет")
         XCTAssertTrue(screen.yes.isEnabled)
         XCTAssertTrue(screen.no.isEnabled)
-        XCTAssertEqual(screen.poster.image?.pngData(), UIImage(named: "The Godfather")?.pngData())
+        let question = try currentQuestion(on: screen)
+        XCTAssertEqual(screen.poster.image?.pngData(), UIImage(named: question.imageName)?.pngData())
         XCTAssertGreaterThan(screen.poster.image?.size.width ?? 0, 0)
         XCTAssertEqual(screen.poster.layer.cornerRadius, 20)
         XCTAssertTrue(screen.poster.clipsToBounds)
@@ -39,11 +44,12 @@ final class MovieQuizViewControllerTests: XCTestCase {
     }
 
     func testPerfectRoundIgnoresRepeatedAnswersAndClearsFeedbackAfterOneSecond() async throws {
-        let screen = try makeScreen()
+        let screen = try await makeScreen()
         defer { screen.close() }
 
         let answeredAt = Date()
-        screen.yes.sendActions(for: .touchUpInside)
+        let firstAnswer = try currentQuestion(on: screen).correctAnswer
+        (firstAnswer ? screen.yes : screen.no).sendActions(for: .touchUpInside)
         XCTAssertFalse(screen.yes.isEnabled)
         XCTAssertFalse(screen.no.isEnabled)
         XCTAssertEqual(screen.poster.layer.borderWidth, 8)
@@ -62,38 +68,40 @@ final class MovieQuizViewControllerTests: XCTestCase {
         XCTAssertNil(screen.poster.layer.borderColor)
         XCTAssertTrue(screen.yes.isEnabled)
         XCTAssertTrue(screen.no.isEnabled)
-        XCTAssertEqual(screen.poster.image?.pngData(), UIImage(named: "The Dark Knight")?.pngData())
+        let nextQuestion = try currentQuestion(on: screen)
+        XCTAssertEqual(screen.poster.image?.pngData(), UIImage(named: nextQuestion.imageName)?.pngData())
 
         for question in 2...10 {
-            try await answer(question <= 6, question: question, on: screen)
+            try await answer(try currentQuestion(on: screen).correctAnswer, question: question, on: screen)
         }
         let alert = try XCTUnwrap(screen.controller.presentedViewController as? UIAlertController)
         XCTAssertEqual(alert.title, "Этот раунд окончен!")
-        XCTAssertEqual(alert.message, "Ваш результат: 10/10")
-        XCTAssertEqual(alert.actions.map(\.title), ["Сыграть ещё раз"])
+        assertResult(alert, correct: 10, on: screen)
+        XCTAssertEqual(alert.actions.map(\.title), ["Сыграть еще раз"])
         XCTAssertEqual(screen.poster.layer.borderWidth, 0)
         XCTAssertFalse(screen.yes.isEnabled)
         XCTAssertFalse(screen.no.isEnabled)
     }
 
     func testWrongAnswerShowsRedFeedbackAndIsExcludedFromScore() async throws {
-        let screen = try makeScreen()
+        let screen = try await makeScreen()
         defer { screen.close() }
 
-        screen.no.sendActions(for: .touchUpInside)
+        let wrongAnswer = try !currentQuestion(on: screen).correctAnswer
+        (wrongAnswer ? screen.yes : screen.no).sendActions(for: .touchUpInside)
         XCTAssertEqual(screen.poster.layer.borderWidth, 8)
         assertBorderColor(screen.poster, red: 245, green: 107, blue: 108)
         try await waitUntil { screen.number.text == "2/10" }
         for question in 2...10 {
-            try await answer(question <= 6, question: question, on: screen)
+            try await answer(try currentQuestion(on: screen).correctAnswer, question: question, on: screen)
         }
         let alert = try XCTUnwrap(screen.controller.presentedViewController as? UIAlertController)
-        XCTAssertEqual(alert.message, "Ваш результат: 9/10")
-        XCTAssertEqual(alert.actions.first?.title, "Сыграть ещё раз")
+        assertResult(alert, correct: 9, on: screen)
+        XCTAssertEqual(alert.actions.first?.title, "Сыграть еще раз")
         XCTAssertEqual(screen.poster.layer.borderWidth, 0)
     }
 
-    func testLayoutIsUnambiguousAtCommonPortraitSizes() throws {
+    func testLayoutIsUnambiguousAtCommonPortraitSizes() async throws {
         let sizes = [
             CGSize(width: 375, height: 812),
             CGSize(width: 390, height: 844),
@@ -111,6 +119,9 @@ final class MovieQuizViewControllerTests: XCTestCase {
             let question: UILabel = try find("questionText", in: controller.view)
             let yes: UIButton = try find("yesButton", in: controller.view)
             let no: UIButton = try find("noButton", in: controller.view)
+            try await waitUntil { yes.isEnabled && no.isEnabled }
+            controller.view.setNeedsLayout()
+            controller.view.layoutIfNeeded()
             for view in descendants(of: controller.view) {
                 XCTAssertFalse(view.hasAmbiguousLayout, "Ambiguous layout at \(size): \(view.accessibilityIdentifier ?? String(describing: type(of: view)))")
             }
@@ -127,28 +138,61 @@ final class MovieQuizViewControllerTests: XCTestCase {
         }
     }
 
-    private func instantiateController() throws -> MovieQuizViewController {
+    private func instantiateController(statisticService: StatisticServiceProtocol? = nil) throws -> MovieQuizViewController {
         let storyboard = UIStoryboard(name: "Main", bundle: Bundle(for: MovieQuizViewController.self))
-        return try XCTUnwrap(storyboard.instantiateInitialViewController() as? MovieQuizViewController)
+        let controller = try XCTUnwrap(storyboard.instantiateInitialViewController() as? MovieQuizViewController)
+        if let statisticService {
+            controller.setup(statisticService: statisticService)
+        }
+        return controller
     }
 
-    private func makeScreen() throws -> QuizScreen {
-        let controller = try instantiateController()
+    private func makeScreen() async throws -> QuizScreen {
+        let suiteName = "MovieQuiz.UIHostTests.\(UUID().uuidString)"
+        let storage = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        storage.removePersistentDomain(forName: suiteName)
+        let statistics = StatisticService(storage: storage)
+        let controller = try instantiateController(statisticService: statistics)
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let window = UIWindow(windowScene: scene)
         window.rootViewController = controller
         window.makeKeyAndVisible()
         controller.loadViewIfNeeded()
         controller.view.layoutIfNeeded()
-        return QuizScreen(
+        let screen = QuizScreen(
             controller: controller,
             window: window,
             poster: try find("moviePoster", in: controller.view),
             question: try find("questionText", in: controller.view),
             number: try find("questionNumber", in: controller.view),
             yes: try find("yesButton", in: controller.view),
-            no: try find("noButton", in: controller.view)
+            no: try find("noButton", in: controller.view),
+            statistics: statistics,
+            storage: storage,
+            suiteName: suiteName
         )
+        try await waitUntil { screen.yes.isEnabled && screen.no.isEnabled }
+        return screen
+    }
+
+    private func currentQuestion(on screen: QuizScreen) throws -> QuizQuestion {
+        let storage = try XCTUnwrap(Mirror(reflecting: screen.controller).children.first { $0.label == "currentQuestion" }?.value)
+        return try XCTUnwrap(Mirror(reflecting: storage).children.first?.value as? QuizQuestion)
+    }
+
+    private func assertResult(_ alert: UIAlertController, correct: Int, on screen: QuizScreen, file: StaticString = #filePath, line: UInt = #line) {
+        let expectedAccuracy = String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), Double(correct) * 10)
+        let expected = """
+        Ваш результат: \(correct)/10
+        Количество сыгранных квизов: 1
+        Рекорд: \(correct)/10 (\(screen.statistics.bestGame.date.dateTimeString))
+        Средняя точность: \(expectedAccuracy)%
+        """
+        XCTAssertEqual(alert.message, expected, file: file, line: line)
+        XCTAssertEqual(screen.statistics.gamesCount, 1, file: file, line: line)
+        XCTAssertEqual(screen.statistics.bestGame.correct, correct, file: file, line: line)
+        XCTAssertEqual(screen.statistics.bestGame.total, 10, file: file, line: line)
+        XCTAssertEqual(screen.statistics.totalAccuracy, Double(correct) * 10, accuracy: 0.001, file: file, line: line)
     }
 
     private func answer(_ yes: Bool, question: Int, on screen: QuizScreen) async throws {

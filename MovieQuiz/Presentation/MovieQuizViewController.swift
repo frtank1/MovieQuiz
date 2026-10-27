@@ -1,83 +1,17 @@
 import UIKit
 
-final class MovieQuizViewController: UIViewController {
-    private struct QuizQuestion {
-        let imageName: String
-        let text: String
-        let correctAnswer: Bool
-    }
-
-    private struct QuizStepViewModel {
-        let image: UIImage
-        let text: String
-        let questionNumber: String
-    }
-
-    private struct QuizResultsViewModel {
-        let title: String
-        let text: String
-        let buttonText: String
-    }
-
+final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
     @IBOutlet private weak var imageView: UIImageView!
     @IBOutlet private weak var textLabel: UILabel!
     @IBOutlet private weak var questionNumberLabel: UILabel!
     @IBOutlet private weak var yesButton: UIButton!
     @IBOutlet private weak var noButton: UIButton!
 
-    private let questions: [QuizQuestion] = [
-        QuizQuestion(
-            imageName: "The Godfather",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: true
-        ),
-        QuizQuestion(
-            imageName: "The Dark Knight",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: true
-        ),
-        QuizQuestion(
-            imageName: "Kill Bill",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: true
-        ),
-        QuizQuestion(
-            imageName: "The Avengers",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: true
-        ),
-        QuizQuestion(
-            imageName: "Deadpool",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: true
-        ),
-        QuizQuestion(
-            imageName: "The Green Knight",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: true
-        ),
-        QuizQuestion(
-            imageName: "Old",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: false
-        ),
-        QuizQuestion(
-            imageName: "The Ice Age Adventures of Buck Wild",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: false
-        ),
-        QuizQuestion(
-            imageName: "Tesla",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: false
-        ),
-        QuizQuestion(
-            imageName: "Vivarium",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: false
-        )
-    ]
-
+    private var questionFactory: QuestionFactoryProtocol?
+    private var alertPresenter: AlertPresenter?
+    private var statisticService: StatisticServiceProtocol = StatisticService()
+    private var currentQuestion: QuizQuestion?
+    private let questionsAmount = 10
     private var currentQuestionIndex = 0
     private var correctAnswers = 0
     private var isAnswerProcessing = false
@@ -95,11 +29,34 @@ final class MovieQuizViewController: UIViewController {
         alpha: 1
     )
 
+    func setup(statisticService: StatisticServiceProtocol) {
+        self.statisticService = statisticService
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         imageView.layer.cornerRadius = 20
         imageView.clipsToBounds = true
-        showCurrentQuestion()
+        alertPresenter = AlertPresenter(viewController: self)
+        let factory = QuestionFactory()
+        factory.setup(delegate: self)
+        questionFactory = factory
+        requestNextQuestion()
+    }
+
+    nonisolated func didReceiveNextQuestion(question: QuizQuestion?) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            guard let question = question else {
+                self.currentQuestion = nil
+                self.setAnswerButtonsEnabled(false)
+                return
+            }
+            self.currentQuestion = question
+            self.show(quiz: self.convert(model: question))
+            self.isAnswerProcessing = false
+            self.setAnswerButtonsEnabled(true)
+        }
     }
 
     @IBAction private func yesButtonClicked(_ sender: UIButton) {
@@ -110,35 +67,33 @@ final class MovieQuizViewController: UIViewController {
         answerCurrentQuestion(false)
     }
 
-    private func showCurrentQuestion() {
-        let question = questions[currentQuestionIndex]
-        show(quiz: convert(model: question))
-        isAnswerProcessing = false
-        setAnswerButtonsEnabled(true)
+    private func requestNextQuestion() {
+        currentQuestion = nil
+        setAnswerButtonsEnabled(false)
+        questionFactory?.requestNextQuestion()
     }
 
     private func convert(model: QuizQuestion) -> QuizStepViewModel {
         QuizStepViewModel(
             image: UIImage(named: model.imageName) ?? UIImage(),
             text: model.text,
-            questionNumber: "\(currentQuestionIndex + 1)/\(questions.count)"
+            questionNumber: "\(currentQuestionIndex + 1)/\(questionsAmount)"
         )
     }
 
     private func show(quiz step: QuizStepViewModel) {
         imageView.image = step.image
-        imageView.layer.borderWidth = 0
-        imageView.layer.borderColor = nil
+        clearAnswerFeedback()
         textLabel.text = step.text
         questionNumberLabel.text = step.questionNumber
     }
 
     private func answerCurrentQuestion(_ answer: Bool) {
-        guard !isAnswerProcessing else { return }
+        guard !isAnswerProcessing, let currentQuestion = currentQuestion else { return }
         isAnswerProcessing = true
         setAnswerButtonsEnabled(false)
 
-        let isCorrect = answer == questions[currentQuestionIndex].correctAnswer
+        let isCorrect = answer == currentQuestion.correctAnswer
         if isCorrect {
             correctAnswers += 1
         }
@@ -150,46 +105,60 @@ final class MovieQuizViewController: UIViewController {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
             guard let self = self else { return }
-            self.imageView.layer.borderWidth = 0
-            self.imageView.layer.borderColor = nil
+            self.clearAnswerFeedback()
             self.showNextQuestionOrResults()
         }
     }
 
     private func showNextQuestionOrResults() {
-        if currentQuestionIndex == questions.count - 1 {
+        if currentQuestionIndex == questionsAmount - 1 {
             showResults()
         } else {
             currentQuestionIndex += 1
-            showCurrentQuestion()
+            requestNextQuestion()
         }
     }
 
     private func showResults() {
+        statisticService.store(correct: correctAnswers, total: questionsAmount)
+        let bestGame = statisticService.bestGame
+        let accuracy = String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), statisticService.totalAccuracy)
         let result = QuizResultsViewModel(
             title: "Этот раунд окончен!",
-            text: "Ваш результат: \(correctAnswers)/\(questions.count)",
-            buttonText: "Сыграть ещё раз"
+            text: """
+            Ваш результат: \(correctAnswers)/\(questionsAmount)
+            Количество сыгранных квизов: \(statisticService.gamesCount)
+            Рекорд: \(bestGame.correct)/\(bestGame.total) (\(bestGame.date.dateTimeString))
+            Средняя точность: \(accuracy)%
+            """,
+            buttonText: "Сыграть еще раз"
         )
         show(quiz: result)
     }
 
     private func show(quiz result: QuizResultsViewModel) {
-        let alert = UIAlertController(
+        let model = AlertModel(
             title: result.title,
             message: result.text,
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: result.buttonText, style: .default) { [weak self] _ in
-            self?.restartQuiz()
-        })
-        present(alert, animated: true)
+            buttonText: result.buttonText
+        ) { [weak self] in
+            guard let self = self else { return }
+            self.restartQuiz()
+        }
+        alertPresenter?.show(model: model)
     }
 
     private func restartQuiz() {
         currentQuestionIndex = 0
         correctAnswers = 0
-        showCurrentQuestion()
+        isAnswerProcessing = false
+        clearAnswerFeedback()
+        requestNextQuestion()
+    }
+
+    private func clearAnswerFeedback() {
+        imageView.layer.borderWidth = 0
+        imageView.layer.borderColor = nil
     }
 
     private func setAnswerButtonsEnabled(_ isEnabled: Bool) {

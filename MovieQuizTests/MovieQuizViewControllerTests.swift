@@ -4,6 +4,40 @@ import UIKit
 
 @MainActor
 final class MovieQuizViewControllerTests: XCTestCase {
+    private final class QuestionFactoryStub: QuestionFactoryProtocol {
+        weak var delegate: QuestionFactoryDelegate?
+        var automaticallyResponds = true
+        var loadCount = 0
+        var requestCount = 0
+
+        func loadData() {
+            loadCount += 1
+            if automaticallyResponds {
+                delegate?.didLoadDataFromServer()
+            }
+        }
+
+        func requestNextQuestion() {
+            requestCount += 1
+            if automaticallyResponds {
+                let data = UIImage(named: "The Godfather")?.pngData() ?? Data()
+                delegate?.didReceiveNextQuestion(question: QuizQuestion(
+                    image: data,
+                    text: "Рейтинг этого фильма больше, чем 7?",
+                    correctAnswer: true
+                ))
+            }
+        }
+    }
+
+    private final class AlertSpy: AlertPresenting {
+        var models: [AlertModel] = []
+
+        func show(model: AlertModel) {
+            models.append(model)
+        }
+    }
+
     @MainActor
     private struct QuizScreen {
         let controller: MovieQuizViewController
@@ -16,6 +50,7 @@ final class MovieQuizViewControllerTests: XCTestCase {
         let statistics: StatisticService
         let storage: UserDefaults
         let suiteName: String
+        let factory: QuestionFactoryStub
 
         func close() {
             controller.dismiss(animated: false)
@@ -30,13 +65,13 @@ final class MovieQuizViewControllerTests: XCTestCase {
         defer { screen.close() }
 
         XCTAssertEqual(screen.number.text, "1/10")
-        XCTAssertEqual(screen.question.text, "Рейтинг этого фильма больше чем 6?")
+        XCTAssertEqual(screen.question.text, "Рейтинг этого фильма больше, чем 7?")
         XCTAssertEqual(screen.yes.title(for: .normal), "Да")
         XCTAssertEqual(screen.no.title(for: .normal), "Нет")
         XCTAssertTrue(screen.yes.isEnabled)
         XCTAssertTrue(screen.no.isEnabled)
         let question = try currentQuestion(on: screen)
-        XCTAssertEqual(screen.poster.image?.pngData(), UIImage(named: question.imageName)?.pngData())
+        XCTAssertEqual(screen.poster.image?.pngData(), UIImage(data: question.image)?.pngData())
         XCTAssertGreaterThan(screen.poster.image?.size.width ?? 0, 0)
         XCTAssertEqual(screen.poster.layer.cornerRadius, 20)
         XCTAssertTrue(screen.poster.clipsToBounds)
@@ -69,7 +104,7 @@ final class MovieQuizViewControllerTests: XCTestCase {
         XCTAssertTrue(screen.yes.isEnabled)
         XCTAssertTrue(screen.no.isEnabled)
         let nextQuestion = try currentQuestion(on: screen)
-        XCTAssertEqual(screen.poster.image?.pngData(), UIImage(named: nextQuestion.imageName)?.pngData())
+        XCTAssertEqual(screen.poster.image?.pngData(), UIImage(data: nextQuestion.image)?.pngData())
 
         for question in 2...10 {
             try await answer(try currentQuestion(on: screen).correctAnswer, question: question, on: screen)
@@ -138,21 +173,120 @@ final class MovieQuizViewControllerTests: XCTestCase {
         }
     }
 
-    private func instantiateController(statisticService: StatisticServiceProtocol? = nil) throws -> MovieQuizViewController {
+    func testLoadingStartsWithSpinnerAndBlocksAnswersUntilPosterArrives() async throws {
+        let factory = QuestionFactoryStub()
+        factory.automaticallyResponds = false
+        let screen = try await makeScreen(factory: factory, waitsForQuestion: false)
+        defer { screen.close() }
+        let indicator: UIActivityIndicatorView = try find("loadingIndicator", in: screen.controller.view)
+
+        XCTAssertEqual(factory.loadCount, 1)
+        XCTAssertEqual(factory.requestCount, 0)
+        XCTAssertTrue(indicator.isAnimating)
+        XCTAssertNil(screen.poster.image)
+        XCTAssertFalse(screen.yes.isEnabled)
+        XCTAssertFalse(screen.no.isEnabled)
+        screen.yes.sendActions(for: .touchUpInside)
+        XCTAssertEqual(screen.poster.layer.borderWidth, 0)
+
+        factory.delegate?.didLoadDataFromServer()
+        try await waitUntil { factory.requestCount == 1 }
+        XCTAssertTrue(indicator.isAnimating)
+        XCTAssertFalse(screen.yes.isEnabled)
+        factory.delegate?.didReceiveNextQuestion(question: QuizQuestion(
+            image: try XCTUnwrap(UIImage(named: "The Godfather")?.pngData()),
+            text: "Рейтинг этого фильма больше, чем 7?",
+            correctAnswer: true
+        ))
+        try await waitUntil { screen.yes.isEnabled }
+        XCTAssertFalse(indicator.isAnimating)
+        XCTAssertTrue(indicator.isHidden)
+        XCTAssertNotNil(screen.poster.image)
+    }
+
+    func testNetworkErrorStopsSpinnerAndRetryLoadsAgainWithoutRecordingGame() async throws {
+        let factory = QuestionFactoryStub()
+        factory.automaticallyResponds = false
+        let presenter = AlertSpy()
+        let screen = try await makeScreen(factory: factory, alertPresenter: presenter, waitsForQuestion: false)
+        defer { screen.close() }
+        let indicator: UIActivityIndicatorView = try find("loadingIndicator", in: screen.controller.view)
+
+        screen.controller.didFailToLoadData(with: URLError(.notConnectedToInternet))
+        try await waitUntil { presenter.models.count == 1 }
+        XCTAssertFalse(indicator.isAnimating)
+        XCTAssertFalse(screen.yes.isEnabled)
+        XCTAssertFalse(screen.no.isEnabled)
+        XCTAssertEqual(screen.statistics.gamesCount, 0)
+        let model = try XCTUnwrap(presenter.models.first)
+        XCTAssertEqual(model.title, "Ошибка")
+        XCTAssertFalse(model.message.isEmpty)
+        XCTAssertEqual(model.buttonText, "Попробовать ещё раз")
+
+        model.completion()
+        XCTAssertEqual(factory.loadCount, 2)
+        XCTAssertTrue(indicator.isAnimating)
+        XCTAssertEqual(screen.number.text, "1/10")
+        XCTAssertFalse(screen.yes.isEnabled)
+        XCTAssertEqual(screen.statistics.gamesCount, 0)
+    }
+
+    func testNilQuestionShowsErrorInsteadOfEnablingBlankQuestion() async throws {
+        let factory = QuestionFactoryStub()
+        factory.automaticallyResponds = false
+        let presenter = AlertSpy()
+        let screen = try await makeScreen(factory: factory, alertPresenter: presenter, waitsForQuestion: false)
+        defer { screen.close() }
+
+        screen.controller.didReceiveNextQuestion(question: nil)
+        try await waitUntil { presenter.models.count == 1 }
+        XCTAssertEqual(presenter.models.first?.title, "Ошибка")
+        XCTAssertFalse(screen.yes.isEnabled)
+        XCTAssertFalse(screen.no.isEnabled)
+    }
+
+    func testErrorInvalidatesDelayedAnswerTransition() async throws {
+        let presenter = AlertSpy()
+        let screen = try await makeScreen(alertPresenter: presenter)
+        defer { screen.close() }
+        screen.yes.sendActions(for: .touchUpInside)
+        screen.controller.showNetworkError(message: "Ошибка постера")
+        try await Task.sleep(nanoseconds: 1_200_000_000)
+
+        XCTAssertEqual(screen.factory.requestCount, 1)
+        XCTAssertEqual(screen.number.text, "1/10")
+        XCTAssertFalse(screen.yes.isEnabled)
+        XCTAssertEqual(screen.statistics.gamesCount, 0)
+    }
+
+    private func instantiateController(
+        statisticService: StatisticServiceProtocol? = nil,
+        factory: QuestionFactoryStub = QuestionFactoryStub(),
+        alertPresenter: AlertPresenting? = nil
+    ) throws -> MovieQuizViewController {
         let storyboard = UIStoryboard(name: "Main", bundle: Bundle(for: MovieQuizViewController.self))
         let controller = try XCTUnwrap(storyboard.instantiateInitialViewController() as? MovieQuizViewController)
         if let statisticService {
             controller.setup(statisticService: statisticService)
         }
+        factory.delegate = controller
+        controller.setup(questionFactory: factory)
+        if let alertPresenter {
+            controller.setup(alertPresenter: alertPresenter)
+        }
         return controller
     }
 
-    private func makeScreen() async throws -> QuizScreen {
+    private func makeScreen(
+        factory: QuestionFactoryStub = QuestionFactoryStub(),
+        alertPresenter: AlertPresenting? = nil,
+        waitsForQuestion: Bool = true
+    ) async throws -> QuizScreen {
         let suiteName = "MovieQuiz.UIHostTests.\(UUID().uuidString)"
         let storage = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         storage.removePersistentDomain(forName: suiteName)
         let statistics = StatisticService(storage: storage)
-        let controller = try instantiateController(statisticService: statistics)
+        let controller = try instantiateController(statisticService: statistics, factory: factory, alertPresenter: alertPresenter)
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let window = UIWindow(windowScene: scene)
         window.rootViewController = controller
@@ -169,9 +303,12 @@ final class MovieQuizViewControllerTests: XCTestCase {
             no: try find("noButton", in: controller.view),
             statistics: statistics,
             storage: storage,
-            suiteName: suiteName
+            suiteName: suiteName,
+            factory: factory
         )
-        try await waitUntil { screen.yes.isEnabled && screen.no.isEnabled }
+        if waitsForQuestion {
+            try await waitUntil { screen.yes.isEnabled && screen.no.isEnabled }
+        }
         return screen
     }
 

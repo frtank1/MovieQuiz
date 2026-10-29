@@ -38,13 +38,13 @@
                                             </label>
                                         </subviews>
                                     </stackView>
-                                    <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" image="The Godfather" translatesAutoresizingMaskIntoConstraints="NO" id="poster-image" userLabel="Movie Poster">
+                                    <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" translatesAutoresizingMaskIntoConstraints="NO" id="poster-image" userLabel="Movie Poster">
                                         <rect key="frame" x="0" y="44" width="374" height="561"/>
                                         <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                         <constraints><constraint firstAttribute="width" secondItem="poster-image" secondAttribute="height" multiplier="2:3" id="poster-ratio"/></constraints>
                                         <accessibility key="accessibilityConfiguration" identifier="moviePoster"/>
                                     </imageView>
-                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" verticalHuggingPriority="249" text="Рейтинг этого фильма больше чем 6?" textAlignment="center" lineBreakMode="wordWrap" numberOfLines="2" translatesAutoresizingMaskIntoConstraints="NO" id="question-text">
+                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" verticalHuggingPriority="249" text="Загрузка фильмов…" textAlignment="center" lineBreakMode="wordWrap" numberOfLines="2" translatesAutoresizingMaskIntoConstraints="NO" id="question-text">
                                         <rect key="frame" x="0" y="625" width="374" height="103"/>
                                         <fontDescription key="fontDescription" name="YSDisplay-Bold" family="YS Display" pointSize="23"/>
                                         <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
@@ -76,10 +76,17 @@
                                     </stackView>
                                 </subviews>
                             </stackView>
+                            <activityIndicatorView hidden="YES" opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="750" verticalHuggingPriority="750" hidesWhenStopped="YES" style="large" translatesAutoresizingMaskIntoConstraints="NO" id="loading-indicator">
+                                <rect key="frame" x="188.5" y="429.5" width="37" height="37"/>
+                                <color key="color" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                <accessibility key="accessibilityConfiguration" identifier="loadingIndicator"/>
+                            </activityIndicatorView>
                         </subviews>
                         <viewLayoutGuide key="safeArea" id="6Tk-OE-BBY"/>
                         <color key="backgroundColor" red="0.1019607843" green="0.1058823529" blue="0.1333333333" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <constraints>
+                            <constraint firstItem="loading-indicator" firstAttribute="centerX" secondItem="8bC-Xf-vdC" secondAttribute="centerX" id="loading-center-x"/>
+                            <constraint firstItem="loading-indicator" firstAttribute="centerY" secondItem="8bC-Xf-vdC" secondAttribute="centerY" id="loading-center-y"/>
                             <constraint firstItem="quiz-stack" firstAttribute="top" secondItem="6Tk-OE-BBY" secondAttribute="top" constant="10" id="quiz-top"/>
                             <constraint firstItem="quiz-stack" firstAttribute="leading" secondItem="6Tk-OE-BBY" secondAttribute="leading" constant="20" id="quiz-leading"/>
                             <constraint firstItem="6Tk-OE-BBY" firstAttribute="trailing" secondItem="quiz-stack" secondAttribute="trailing" constant="20" id="quiz-trailing"/>
@@ -87,6 +94,7 @@
                         </constraints>
                     </view>
                     <connections>
+                        <outlet property="activityIndicator" destination="loading-indicator" id="loading-outlet"/>
                         <outlet property="imageView" destination="poster-image" id="poster-outlet"/>
                         <outlet property="textLabel" destination="question-text" id="text-outlet"/>
                         <outlet property="questionNumberLabel" destination="question-number" id="number-outlet"/>
@@ -99,5 +107,4 @@
             <point key="canvasLocation" x="-55.072463768115945" y="55.580357142857139"/>
         </scene>
     </scenes>
-    <resources><image name="The Godfather" width="388" height="581"/></resources>
 </document>

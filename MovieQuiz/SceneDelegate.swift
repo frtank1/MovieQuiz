@@ -9,7 +9,15 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         willConnectTo session: UISceneSession,
         options connectionOptions: UIScene.ConnectionOptions
     ) {
-        guard (scene as? UIWindowScene) != nil else { return }
+        guard let windowScene = scene as? UIWindowScene else { return }
+        let window = UIWindow(windowScene: windowScene)
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            window.rootViewController = UIViewController()
+        } else {
+            window.rootViewController = UIStoryboard(name: "Main", bundle: nil).instantiateInitialViewController()
+        }
+        self.window = window
+        window.makeKeyAndVisible()
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {}

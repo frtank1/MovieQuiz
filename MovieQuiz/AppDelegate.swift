@@ -1,5 +1,5 @@
 import UIKit
-
+//я помню про pool request, с 8  начну сдавать 
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(

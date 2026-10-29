@@ -22,11 +22,11 @@ enum MoviesLoaderError: LocalizedError {
 }
 
 struct MoviesLoader: MoviesLoading {
-    private let networkClient: NetworkClientProtocol
+    private let networkClient: NetworkRouting
     private let mostPopularMoviesUrl: URL
 
     init(
-        networkClient: NetworkClientProtocol = NetworkClient(),
+        networkClient: NetworkRouting = NetworkClient(),
         url: URL = URL(string: "https://tv-api.com/api/top-250-movies?apikey=juv0ohccyeycmvbwn4du")!
     ) {
         self.networkClient = networkClient

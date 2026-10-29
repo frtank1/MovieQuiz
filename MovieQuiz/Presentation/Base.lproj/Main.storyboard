@@ -34,7 +34,7 @@
                                                 <rect key="frame" x="325" y="0" width="49" height="24"/>
                                                 <fontDescription key="fontDescription" name="YSDisplay-Medium" family="YS Display" pointSize="20"/>
                                                 <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
-                                                <accessibility key="accessibilityConfiguration" identifier="questionNumber"/>
+                                                <accessibility key="accessibilityConfiguration" identifier="Index"/>
                                             </label>
                                         </subviews>
                                     </stackView>
@@ -42,7 +42,7 @@
                                         <rect key="frame" x="0" y="44" width="374" height="561"/>
                                         <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                         <constraints><constraint firstAttribute="width" secondItem="poster-image" secondAttribute="height" multiplier="2:3" id="poster-ratio"/></constraints>
-                                        <accessibility key="accessibilityConfiguration" identifier="moviePoster"/>
+                                        <accessibility key="accessibilityConfiguration" identifier="Poster"/>
                                     </imageView>
                                     <label opaque="NO" userInteractionEnabled="NO" contentMode="left" verticalHuggingPriority="249" text="Загрузка фильмов…" textAlignment="center" lineBreakMode="wordWrap" numberOfLines="2" translatesAutoresizingMaskIntoConstraints="NO" id="question-text">
                                         <rect key="frame" x="0" y="625" width="374" height="103"/>
@@ -59,7 +59,7 @@
                                                 <fontDescription key="fontDescription" name="YSDisplay-Medium" family="YS Display" pointSize="20"/>
                                                 <state key="normal" title="Нет"><color key="titleColor" red="0.1019607843" green="0.1058823529" blue="0.1333333333" alpha="1" colorSpace="custom" customColorSpace="sRGB"/></state>
                                                 <userDefinedRuntimeAttributes><userDefinedRuntimeAttribute type="number" keyPath="layer.cornerRadius"><real key="value" value="15"/></userDefinedRuntimeAttribute></userDefinedRuntimeAttributes>
-                                                <accessibility key="accessibilityConfiguration" identifier="noButton"/>
+                                                <accessibility key="accessibilityConfiguration" identifier="No"/>
                                                 <connections><action selector="noButtonClicked:" destination="BYZ-38-t0r" eventType="touchUpInside" id="no-action"/></connections>
                                             </button>
                                             <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="custom" translatesAutoresizingMaskIntoConstraints="NO" id="yes-button" userLabel="Yes Button">
@@ -68,7 +68,7 @@
                                                 <fontDescription key="fontDescription" name="YSDisplay-Medium" family="YS Display" pointSize="20"/>
                                                 <state key="normal" title="Да"><color key="titleColor" red="0.1019607843" green="0.1058823529" blue="0.1333333333" alpha="1" colorSpace="custom" customColorSpace="sRGB"/></state>
                                                 <userDefinedRuntimeAttributes><userDefinedRuntimeAttribute type="number" keyPath="layer.cornerRadius"><real key="value" value="15"/></userDefinedRuntimeAttribute></userDefinedRuntimeAttributes>
-                                                <accessibility key="accessibilityConfiguration" identifier="yesButton"/>
+                                                <accessibility key="accessibilityConfiguration" identifier="Yes"/>
                                                 <connections><action selector="yesButtonClicked:" destination="BYZ-38-t0r" eventType="touchUpInside" id="yes-action"/></connections>
                                             </button>
                                         </subviews>

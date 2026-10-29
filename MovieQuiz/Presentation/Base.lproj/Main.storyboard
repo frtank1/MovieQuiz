@@ -7,21 +7,97 @@
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
+    <customFonts key="customFonts">
+        <array key="YS Display-Bold.ttf"><string>YSDisplay-Bold</string></array>
+        <array key="YS Display-Medium.ttf"><string>YSDisplay-Medium</string></array>
+    </customFonts>
     <scenes>
-        <!--Movie Quiz View Controller-->
         <scene sceneID="tne-QT-ifu">
             <objects>
                 <viewController id="BYZ-38-t0r" customClass="MovieQuizViewController" customModule="MovieQuiz" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="8bC-Xf-vdC">
                         <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <stackView opaque="NO" contentMode="scaleToFill" axis="vertical" spacing="20" translatesAutoresizingMaskIntoConstraints="NO" id="quiz-stack" userLabel="Quiz Stack">
+                                <rect key="frame" x="20" y="54" width="374" height="808"/>
+                                <subviews>
+                                    <stackView opaque="NO" contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="header-stack" userLabel="Question Header">
+                                        <rect key="frame" x="0" y="0" width="374" height="24"/>
+                                        <subviews>
+                                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="1000" text="Вопрос:" lineBreakMode="tailTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="question-title">
+                                                <rect key="frame" x="0" y="0" width="325" height="24"/>
+                                                <fontDescription key="fontDescription" name="YSDisplay-Medium" family="YS Display" pointSize="20"/>
+                                                <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                            </label>
+                                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="252" verticalHuggingPriority="1000" text="1/10" textAlignment="right" lineBreakMode="tailTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="question-number">
+                                                <rect key="frame" x="325" y="0" width="49" height="24"/>
+                                                <fontDescription key="fontDescription" name="YSDisplay-Medium" family="YS Display" pointSize="20"/>
+                                                <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                                <accessibility key="accessibilityConfiguration" identifier="questionNumber"/>
+                                            </label>
+                                        </subviews>
+                                    </stackView>
+                                    <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" image="The Godfather" translatesAutoresizingMaskIntoConstraints="NO" id="poster-image" userLabel="Movie Poster">
+                                        <rect key="frame" x="0" y="44" width="374" height="561"/>
+                                        <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                        <constraints><constraint firstAttribute="width" secondItem="poster-image" secondAttribute="height" multiplier="2:3" id="poster-ratio"/></constraints>
+                                        <accessibility key="accessibilityConfiguration" identifier="moviePoster"/>
+                                    </imageView>
+                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" verticalHuggingPriority="249" text="Рейтинг этого фильма больше чем 6?" textAlignment="center" lineBreakMode="wordWrap" numberOfLines="2" translatesAutoresizingMaskIntoConstraints="NO" id="question-text">
+                                        <rect key="frame" x="0" y="625" width="374" height="103"/>
+                                        <fontDescription key="fontDescription" name="YSDisplay-Bold" family="YS Display" pointSize="23"/>
+                                        <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                        <accessibility key="accessibilityConfiguration" identifier="questionText"/>
+                                    </label>
+                                    <stackView opaque="NO" contentMode="scaleToFill" distribution="fillEqually" spacing="20" translatesAutoresizingMaskIntoConstraints="NO" id="answers-stack" userLabel="Answer Buttons">
+                                        <rect key="frame" x="0" y="748" width="374" height="60"/>
+                                        <subviews>
+                                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="custom" translatesAutoresizingMaskIntoConstraints="NO" id="no-button" userLabel="No Button">
+                                                <rect key="frame" x="0" y="0" width="177" height="60"/>
+                                                <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                                <fontDescription key="fontDescription" name="YSDisplay-Medium" family="YS Display" pointSize="20"/>
+                                                <state key="normal" title="Нет"><color key="titleColor" red="0.1019607843" green="0.1058823529" blue="0.1333333333" alpha="1" colorSpace="custom" customColorSpace="sRGB"/></state>
+                                                <userDefinedRuntimeAttributes><userDefinedRuntimeAttribute type="number" keyPath="layer.cornerRadius"><real key="value" value="15"/></userDefinedRuntimeAttribute></userDefinedRuntimeAttributes>
+                                                <accessibility key="accessibilityConfiguration" identifier="noButton"/>
+                                                <connections><action selector="noButtonClicked:" destination="BYZ-38-t0r" eventType="touchUpInside" id="no-action"/></connections>
+                                            </button>
+                                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="custom" translatesAutoresizingMaskIntoConstraints="NO" id="yes-button" userLabel="Yes Button">
+                                                <rect key="frame" x="197" y="0" width="177" height="60"/>
+                                                <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                                <fontDescription key="fontDescription" name="YSDisplay-Medium" family="YS Display" pointSize="20"/>
+                                                <state key="normal" title="Да"><color key="titleColor" red="0.1019607843" green="0.1058823529" blue="0.1333333333" alpha="1" colorSpace="custom" customColorSpace="sRGB"/></state>
+                                                <userDefinedRuntimeAttributes><userDefinedRuntimeAttribute type="number" keyPath="layer.cornerRadius"><real key="value" value="15"/></userDefinedRuntimeAttribute></userDefinedRuntimeAttributes>
+                                                <accessibility key="accessibilityConfiguration" identifier="yesButton"/>
+                                                <connections><action selector="yesButtonClicked:" destination="BYZ-38-t0r" eventType="touchUpInside" id="yes-action"/></connections>
+                                            </button>
+                                        </subviews>
+                                        <constraints><constraint firstAttribute="height" constant="60" id="answers-height"/></constraints>
+                                    </stackView>
+                                </subviews>
+                            </stackView>
+                        </subviews>
                         <viewLayoutGuide key="safeArea" id="6Tk-OE-BBY"/>
-                        <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                        <color key="backgroundColor" red="0.1019607843" green="0.1058823529" blue="0.1333333333" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <constraints>
+                            <constraint firstItem="quiz-stack" firstAttribute="top" secondItem="6Tk-OE-BBY" secondAttribute="top" constant="10" id="quiz-top"/>
+                            <constraint firstItem="quiz-stack" firstAttribute="leading" secondItem="6Tk-OE-BBY" secondAttribute="leading" constant="20" id="quiz-leading"/>
+                            <constraint firstItem="6Tk-OE-BBY" firstAttribute="trailing" secondItem="quiz-stack" secondAttribute="trailing" constant="20" id="quiz-trailing"/>
+                            <constraint firstItem="6Tk-OE-BBY" firstAttribute="bottom" secondItem="quiz-stack" secondAttribute="bottom" id="quiz-bottom"/>
+                        </constraints>
                     </view>
+                    <connections>
+                        <outlet property="imageView" destination="poster-image" id="poster-outlet"/>
+                        <outlet property="textLabel" destination="question-text" id="text-outlet"/>
+                        <outlet property="questionNumberLabel" destination="question-number" id="number-outlet"/>
+                        <outlet property="yesButton" destination="yes-button" id="yes-outlet"/>
+                        <outlet property="noButton" destination="no-button" id="no-outlet"/>
+                    </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="dkx-z0-nzr" sceneMemberID="firstResponder"/>
             </objects>
             <point key="canvasLocation" x="-55.072463768115945" y="55.580357142857139"/>
         </scene>
     </scenes>
+    <resources><image name="The Godfather" width="388" height="581"/></resources>
 </document>
